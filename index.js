@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const dotenv = require('dotenv');
 const cron = require('node-cron');
 const axios = require('axios');
+const express = require('express'); // 🧩 Added express
 
 dotenv.config();
 
@@ -76,3 +77,15 @@ cron.schedule('0 */3 * * *', () => {
 // ⏱️ Initial run on startup
 const auth = createOAuthClient();
 checkEmails(auth);
+
+// 🟢 Keep the server alive on Render (fake HTTP server)
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('📬 Gmail Keyword Notifier is Running');
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Server is running on port ${PORT}`);
+});
