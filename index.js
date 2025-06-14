@@ -6,6 +6,7 @@ const axios = require('axios');
 dotenv.config();
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const notifiedMessageIds = new Set(); // 🧠 Keeps track of already-notified emails
 
 function createOAuthClient() {
   const oAuth2Client = new google.auth.OAuth2(
@@ -33,6 +34,8 @@ function checkEmails(auth) {
       const messages = res.data.messages || [];
 
       for (const msg of messages) {
+        if (notifiedMessageIds.has(msg.id)) continue; // ⛔ Already notified
+
         const msgData = await gmail.users.messages.get({ userId: 'me', id: msg.id });
         const snippet = msgData.data.snippet.toLowerCase();
         const subjectHeader = msgData.data.payload.headers.find((h) => h.name === 'Subject');
@@ -43,6 +46,7 @@ function checkEmails(auth) {
 
         if (matched) {
           await sendTelegramNotification(subject, msg.id);
+          notifiedMessageIds.add(msg.id); // ✅ Mark as notified
         }
       }
     }
@@ -62,13 +66,13 @@ async function sendTelegramNotification(subject, messageId) {
   console.log('✅ Telegram alert with link sent');
 }
 
-// 🔁 Schedule: daily at 9 AM
-cron.schedule('0 9 * * *', () => {
-  console.log('🕘 Cron Triggered - Checking emails...');
+// 🔁 Run every 3 hours (at minute 0)
+cron.schedule('0 */3 * * *', () => {
+  console.log('⏰ Cron Triggered - Checking emails...');
   const auth = createOAuthClient();
   checkEmails(auth);
 });
 
-// ⏱️ Initial trigger
+// ⏱️ Initial run on startup
 const auth = createOAuthClient();
 checkEmails(auth);
