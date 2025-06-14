@@ -1,0 +1,24 @@
+# Node modules
+node_modules/
+
+# Local environment variables
+.env
+
+# Gmail OAuth tokens
+token.json
+credentials.json
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs and debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE-specific
+.vscode/
+.idea/
+
+encode.js
