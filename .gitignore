@@ -7,6 +7,7 @@ node_modules/
 # Gmail OAuth tokens
 token.json
 credentials.json
+credentials.json
 
 # System files
 .DS_Store

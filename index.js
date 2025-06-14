@@ -1,7 +1,4 @@
-const fs = require('fs');
-const readline = require('readline');
 const { google } = require('googleapis');
-const open = (...args) => import('open').then(module => module.default(...args));
 const dotenv = require('dotenv');
 const cron = require('node-cron');
 const axios = require('axios');
@@ -9,62 +6,22 @@ const axios = require('axios');
 dotenv.config();
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const TOKEN_JSON = 'token.json';
-const TOKEN_BASE64 = 'token.base64';
-const CREDENTIALS_TXT = 'credentials.txt';
-const CREDENTIALS_JSON = 'credentials.json';
 
-// Decode credentials.txt → credentials.json if needed
-if (!fs.existsSync(CREDENTIALS_JSON) && fs.existsSync(CREDENTIALS_TXT)) {
-  const base64 = fs.readFileSync(CREDENTIALS_TXT, 'utf8');
-  const json = Buffer.from(base64, 'base64').toString('utf8');
-  fs.writeFileSync(CREDENTIALS_JSON, json);
-  console.log('🛠️ Decoded credentials.txt → credentials.json');
-}
+function createOAuthClient() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    process.env.REDIRECT_URI
+  );
 
-// Decode token.base64 → token.json if needed
-if (!fs.existsSync(TOKEN_JSON) && fs.existsSync(TOKEN_BASE64)) {
-  const base64 = fs.readFileSync(TOKEN_BASE64, 'utf8');
-  const json = Buffer.from(base64, 'base64').toString('utf8');
-  fs.writeFileSync(TOKEN_JSON, json);
-  console.log('🛠️ Decoded token.base64 → token.json');
-}
-
-function authorize(callback) {
-  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_JSON));
-  const { client_secret, client_id, redirect_uris } = credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-
-  if (fs.existsSync(TOKEN_JSON)) {
-    oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_JSON)));
-    callback(oAuth2Client);
-  } else {
-    getNewToken(oAuth2Client, callback);
-  }
-}
-
-function getNewToken(oAuth2Client, callback) {
-  const authUrl = oAuth2Client.generateAuthUrl({ access_type: 'offline', scope: SCOPES });
-  console.log('🔐 Authorize this app by visiting this URL:', authUrl);
-  open(authUrl);
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  rl.question('Enter the code from the page: ', (code) => {
-    rl.close();
-    oAuth2Client.getToken(code, (err, token) => {
-      if (err) return console.error('❌ Error retrieving token', err);
-      oAuth2Client.setCredentials(token);
-      fs.writeFileSync(TOKEN_JSON, JSON.stringify(token));
-      console.log('✅ Token stored to', TOKEN_JSON);
-
-      // Optional: auto encode to token.base64 (for pushing to GitHub safely)
-      const encoded = Buffer.from(JSON.stringify(token)).toString('base64');
-      fs.writeFileSync(TOKEN_BASE64, encoded);
-      console.log('📦 Encoded token.json → token.base64');
-
-      callback(oAuth2Client);
-    });
+  oAuth2Client.setCredentials({
+    access_token: process.env.ACCESS_TOKEN,
+    refresh_token: process.env.REFRESH_TOKEN,
+    scope: process.env.SCOPE,
+    token_type: process.env.TOKEN_TYPE,
   });
+
+  return oAuth2Client;
 }
 
 function checkEmails(auth) {
@@ -105,11 +62,13 @@ async function sendTelegramNotification(subject, messageId) {
   console.log('✅ Telegram alert with link sent');
 }
 
-// 🔁 Daily at 9AM — change timing if needed
+// 🔁 Schedule: daily at 9 AM
 cron.schedule('0 9 * * *', () => {
   console.log('🕘 Cron Triggered - Checking emails...');
-  authorize(checkEmails);
+  const auth = createOAuthClient();
+  checkEmails(auth);
 });
 
-// ⏱️ Initial run for testing
-authorize(checkEmails);
+// ⏱️ Initial trigger
+const auth = createOAuthClient();
+checkEmails(auth);
